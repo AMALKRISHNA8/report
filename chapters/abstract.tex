@@ -1,0 +1,11 @@
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\LARGE\textbf{Abstract}}\\[1cm]
+\end{center}
+
+In the growing need for privacy-preserving authentication in digital systems, we propose ZeroAuth --- a Zero-Knowledge Proof (ZKP) based authentication platform for private credential verification. The system enables users to prove credentials such as age, student status, or trial eligibility without revealing any underlying private data, thereby preserving user privacy while maintaining verifiable trust. Built on a three-component architecture comprising a Wallet (React Native/Expo mobile app), a Relay (Node.js/Express server), and a Web SDK (JavaScript integration library), ZeroAuth generates cryptographic proofs using Groth16 zk-SNARKs powered by Circom circuits and snarkjs, with Poseidon hashing for attribute commitments and Ed25519 elliptic curve cryptography for decentralized wallet identity following the W3C \texttt{did:key} specification. The Relay server manages verification sessions via Supabase (PostgreSQL) with Row-Level Security (RLS) policies, and communication between the Wallet and verifier websites is facilitated through a QR code-based protocol with session expiry and SHA-256 proof replay protection. Additional security mechanisms include rate limiting, proof schema validation, PIN-based wallet protection with timing-safe comparison, credential revocation checking, and offline action queuing with automatic sync on reconnection. The SDK enables any third-party website to integrate passwordless, privacy-preserving authentication with minimal code, demonstrating a scalable and practically deployable approach to Zero-Knowledge cryptography in mobile environments with applications in age verification, student identity, and trial/license management.
+
+\vspace{1cm}
+\noindent\textbf{Keywords:} Zero-Knowledge Proof, zk-SNARK, Authentication, Privacy-Preserving Cryptography, Circom, Credential Verification, Decentralized Identity
+

@@ -1,0 +1,105 @@
+\chapter{Requirement Specifications}
+
+This chapter presents the complete requirement specifications for the ZeroAuth system, covering user modules, software requirements specification, hardware and software requirements, cryptographic standards, and communication protocols.
+
+\section{User Modules}
+
+The ZeroAuth system is designed around three user-facing modules, each with a distinct role in the verification flow. The Wallet User, also referred to as the Prover, is the end user operating the mobile application. This user stores personal credentials locally on the device, scans QR codes presented by verifier websites, and generates Zero-Knowledge Proofs that demonstrate credential validity without revealing any private data.
+
+The Verifier is a third-party web application that integrates the ZeroAuth Web SDK to initiate credential verification requests. The Verifier displays a QR code to the user, waits for the verification session to be completed, and receives a confirmation once the Relay server has validated the proof. The Relay Server acts as the central intermediary, managing verification session lifecycles, validating cryptographic proofs, and communicating results between the Wallet and the Verifier through a REST API.
+
+\section{Software Requirements Specification (SRS)}
+
+\subsection{System Overview}
+
+ZeroAuth is a three-component privacy-preserving authentication platform that enables users to prove ownership of credentials such as age or student status without revealing any underlying private data. The Wallet mobile application handles credential storage and on-device proof generation. The Relay server manages session creation, proof verification, and session status updates. The Web SDK allows any third-party website to integrate ZeroAuth verification with minimal configuration, operating entirely over standard HTTPS connections without any blockchain dependency.
+
+\subsection{Functional Requirements}
+
+The system shall allow users to add credentials to the mobile wallet, including Age Verification, Student ID, and Trial credential types, each stored with associated private attributes and a cryptographic Poseidon hash commitment. When a user scans a verifier's QR code, the system shall generate a Groth16 zk-SNARK proof for the selected credential without transmitting any private attribute to the server. Users shall also be able to view credential details, session history, and delete credentials from the Wallet at any time.
+
+The Relay server shall create a new verification session with a unique session ID, cryptographic nonce, and a 5-minute time-to-live (TTL) upon request from the Verifier. The session parameters shall be encoded into a QR code displayed on the verifier website, which the Wallet scans and parses. The Wallet shall then submit the generated proof to the Relay server via a REST API endpoint, where it shall be verified server-side using the snarkjs Groth16 verification function and a pre-stored verification key. The Web SDK shall poll the Relay server every 2 seconds and detect when a session reaches the COMPLETED status.
+
+The system shall detect and reject duplicate proof submissions using SHA-256 proof hashing to prevent replay attacks. Sessions that have not been completed within the 5-minute TTL shall be automatically expired and deleted. The Wallet shall be protected with a user-defined PIN, stored as a salted SHA-256 hash and verified using timing-safe comparison. The system shall support offline action queuing and automatically process queued actions when network connectivity is restored, along with credential revocation checking using a 1-hour offline cache.
+
+\subsection{Non-Functional Requirements}
+
+\subsubsection{Performance}
+The Relay API shall respond to session creation requests within 500 milliseconds under normal load. ZK proof verification on the server shall complete within 100 milliseconds. The mobile Wallet shall generate proofs within 90 seconds on any supported Android device, and the SDK polling mechanism shall detect a completed session within 2 seconds of proof acceptance.
+
+\subsubsection{Security}
+All communications between system components shall use HTTPS with TLS encryption. Private credential attributes shall never be transmitted outside the mobile device at any point in the verification flow. The system shall enforce a rate limit of 500 requests per IP address per 15 minutes on all Relay API endpoints, with Row-Level Security policies enforced on all Supabase database tables. Wallet private keys shall be stored exclusively in the platform's secure enclave.
+
+\subsubsection{Usability}
+A new user shall be able to add a credential and complete a QR-based verification flow within 5 minutes without prior technical knowledge. The Wallet interface shall clearly indicate proof generation progress with visual feedback, and the Web SDK shall be integrable into any website with a single script tag or React component requiring no cryptographic expertise from the developer.
+
+\subsubsection{Reliability}
+The Relay server shall maintain 99\% uptime during the project evaluation period. Expired sessions shall be cleaned up automatically within 60 seconds of expiry without manual intervention, and the offline queue shall ensure no action is permanently lost due to temporary network unavailability.
+
+\subsubsection{Portability and Maintainability}
+The Wallet application shall run on Android devices version 10 and above, and the Web SDK shall be compatible with all modern browsers. The Relay server shall be deployable to any Node.js-compatible cloud platform. All source code shall follow TypeScript coding conventions, and the system architecture shall support the addition of new credential types simply by adding a new Circom circuit and uploading the corresponding verification key, with no changes required to the core Relay or SDK codebase.
+
+\section{Hardware Requirements}
+
+The hardware requirements for the ZeroAuth system cover the development workstation, the mobile device used for the Wallet application, and the cloud server running the Relay API.
+
+\subsection{Development System}
+
+For development and testing purposes, the workstation should be equipped with an Intel Core i5 8th generation or higher processor running at 2.0 GHz or above. A minimum of 8 GB of RAM is required, with 16 GB recommended when running Android emulators alongside the development server. Storage of at least 256 GB SSD is needed to accommodate project files, Node.js modules, compiled circuit artifacts, and emulator disk images. A 1080p or higher resolution display is recommended, along with a stable Ethernet or Wi-Fi network connection.
+
+\subsection{Mobile Device (Wallet Application)}
+
+The Wallet application runs on Android smartphones with Android 10 or higher. Any ARM-based System-on-Chip is supported; the application was tested on a Snapdragon 730G, Google Tensor G2, and Unisoc T310 to validate performance across device tiers. A minimum of 2 GB RAM is required for proof generation, though 4 GB or more is recommended for faster performance. A rear camera with autofocus support is needed for QR code scanning, and at least 100 MB of free storage is required for the application and bundled circuit WASM files.
+
+\subsection{Server (Relay API)}
+
+The Relay server is deployed on Render's cloud hosting platform. A shared vCPU of at least 0.5 vCPU equivalent, 512 MB RAM minimum, and a public HTTPS-enabled endpoint with DNS resolution are required for production deployment.
+
+\section{Software Requirements}
+
+\subsection{Operating System}
+
+The development environment is compatible with Windows 10/11, Ubuntu 20.04 LTS, or macOS 12 (Monterey) and above. The Relay server runs on a Linux-based environment managed by the Render cloud platform. The Wallet application targets Android 10 or higher, with iOS support planned for future releases.
+
+\subsection{Programming Languages and Runtime}
+
+TypeScript and JavaScript are the primary languages used across all three components, including the Wallet (React Native), Relay (Node.js), and Web SDK. Circom, a domain-specific language, is used to write the Zero-Knowledge arithmetic circuits, and SQL is used for Supabase schema definition and Row-Level Security policy setup. Node.js v18 LTS is required for the Relay server and build tooling, and Rust (Cargo) is needed to compile the Circom 2.0 circuit compiler.
+
+\subsection{Development Tools and IDEs}
+
+Visual Studio Code is the primary IDE for all TypeScript, JavaScript, and Circom development. Android Studio is used for Android emulator testing and APK build verification. Expo Go and EAS CLI are used for mobile app development, preview builds, and production APK generation. Postman is used for manual REST API testing, and Git with GitHub provides version control and collaborative source management.
+
+\subsection{Frameworks, Libraries, and Database}
+
+The Wallet application is built with React Native and the Expo framework for cross-platform mobile development. The Relay server is powered by Express.js as the HTTP framework. The snarkjs library provides the JavaScript implementation of Groth16 proof generation and verification, while Circom 2.0 and circomlib supply the circuit compiler and standard circuit templates including Poseidon and comparators. Zustand handles credential state management in the Wallet, and Expo SecureStore provides secure private key storage. Supabase (PostgreSQL) serves as the managed cloud database for session and verification key storage, with built-in Row-Level Security. Compatible web browsers for verifier site integration include Google Chrome (version 100 or higher), Mozilla Firefox, and Microsoft Edge.
+
+\section{Cryptographic Standards}
+
+The ZeroAuth system relies on four cryptographic primitives working in concert to achieve privacy-preserving verification. Groth16 zk-SNARK is the proving system used for generating and verifying zero-knowledge proofs, producing constant-size proofs consisting of three group elements ($\pi_a$, $\pi_b$, $\pi_c$) that can be verified in under 10 milliseconds. Poseidon is an arithmetic-friendly hash function optimized for ZK circuits, used to create cryptographic commitments that bind credential attributes to the proof without exposing any private values. Ed25519 digital signatures are used for wallet identity management following the W3C \texttt{did:key} specification, with private keys stored securely in the platform's secure enclave. SHA-256 is used for proof replay protection through hash deduplication, PIN hashing with random salt, and general-purpose cryptographic operations.
+
+\section{Communication Protocol}
+
+\subsection{REST API (HTTPS)}
+
+The Relay server exposes a RESTful API over HTTPS for all session management and proof submission operations. Table 3.1 below lists the available endpoints along with their HTTP methods and descriptions.
+
+\begin{table}[H]
+\centering
+\caption{API Endpoints}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Description} \\
+\hline
+\texttt{/api/v1/sessions} & POST & Create a new verification session \\
+\texttt{/api/v1/sessions/:id} & GET & Get session status \\
+\texttt{/api/v1/sessions/:id/proof} & POST & Submit a proof for verification \\
+\texttt{/health} & GET & Server health check \\
+\hline
+\end{tabular}
+\end{table}
+
+As shown in Table 3.1, the API follows RESTful conventions with clearly separated endpoints for session creation, status polling, and proof submission. The \texttt{/health} endpoint allows infrastructure monitoring tools to confirm that the Relay server is running and reachable.
+
+\subsection{QR Code Protocol}
+
+Communication between the verifier website and the mobile wallet is facilitated through a JSON-based QR code protocol. The QR payload encodes the session ID, a cryptographic nonce, verifier identity information, the list of required claims, the credential type requested, and an expiration timestamp. The Wallet validates the payload structure and checks the expiration time before initiating proof generation, ensuring that stale or malformed QR codes are rejected.

@@ -1,0 +1,50 @@
+\chapter{Introduction}
+
+\section{Background}
+
+With the increasing digitization of services and the widespread adoption of online platforms, secure and privacy-preserving authentication has become a critical concern. Traditional authentication methods such as passwords, OAuth tokens, and centralized identity systems inherently expose sensitive personal information to verifiers and intermediaries. This creates vulnerabilities to data breaches, identity theft, and unauthorized surveillance.
+
+The digital era has ushered in an unprecedented scale of data collection and identity verification requirements. From age-gating on content platforms to student discounts on e-commerce sites, from professional license verification to region-based access controls, organizations constantly need to verify who their users are and what attributes they possess. Yet existing approaches to identity verification are fundamentally broken from a privacy standpoint.
+
+Zero-Knowledge Proofs (ZKPs) offer a mathematically rigorous solution to this dilemma. First introduced by Goldwasser, Micali, and Rackoff in 1985, ZKPs allow a prover to convince a verifier that a statement is true without revealing any information beyond the validity of the statement itself. Applied to identity verification, this means a user can prove their age exceeds a threshold without revealing their exact birth date, prove they are a student without revealing their institution or student ID number, and prove eligibility for a trial without revealing any personal details whatsoever. The emergence of zk-SNARKs (Zero-Knowledge Succinct Non-interactive Arguments of Knowledge), particularly the Groth16 proving system, has made practical ZKP-based authentication feasible on consumer hardware, including mobile devices.
+
+\section{Motivation}
+
+Consider a simple scenario: a user wishes to access age-restricted content on a streaming platform. With traditional methods, the user must submit a government ID, credit card details, or other sensitive documents. This data is stored by the verifying service, creating a honeypot for attackers. A single breach exposes millions of users' private information. Even worse, services can aggregate and monetize this data in ways users never anticipated or consented to.
+
+The problem is compounded by the proliferation of services requiring credential verification. A user may need to prove their age on a dozen different platforms, submit student IDs to multiple marketplaces, and verify their professional credentials to numerous service providers. Each verification event creates a new copy of sensitive data held by a new party, exponentially increasing the attack surface.
+
+These growing concerns over data privacy, identity theft, and the lack of user control over personal information motivate the development of ZeroAuth. There is a clear and urgent need for a practical, deployable system that enables users to prove credential validity without disclosing the underlying data. This project builds upon the theoretical foundations of ZKPs and the practical advances in zk-SNARKs to deliver exactly such a system, ready for real-world deployment on consumer mobile devices.
+
+\section{Problem Statement}
+
+Existing identity authentication systems suffer from several fundamental limitations. Traditional authentication systems require users to share personal data such as name, date of birth, and ID numbers with verifiers who store and process this information, creating significant privacy risks. Centralized authentication providers create single points of failure and enable mass surveillance of users. Massive breaches repeatedly demonstrate that centralized credential storage is inherently vulnerable. Users have no control over how their identity data is stored, processed, or shared once submitted to a verifier. Authentication tokens and credentials submitted to one service can potentially be replayed at other services, further weakening the security model. Perhaps most critically, proving a simple attribute like being over 18 requires disclosing far more information than is necessary for the verification purpose, exposing actual birth dates and ID numbers unnecessarily.
+
+The core challenge is: \textit{How can a user prove they possess a valid credential without revealing the credential itself?} This is precisely what ZeroAuth solves.
+
+\section{Proposed Solution: ZeroAuth}
+
+ZeroAuth enables users to prove ownership of credentials such as age, student status, or trial eligibility without revealing the underlying private data. The system is built on a three-component architecture: a Wallet mobile application (React Native/Expo), a Relay server (Node.js/Express), and a Web SDK for seamless third-party integration. The Wallet generates cryptographic proofs using Groth16 zk-SNARK circuits implemented in Circom, while the Relay verifies these proofs and manages verification sessions via Supabase (PostgreSQL). The SDK allows any website to integrate zero-knowledge verification with minimal code.
+
+The system employs multiple layers of security including Ed25519 digital signatures for wallet identity, Poseidon hashing for cryptographic commitments, SHA-256 for proof replay protection, rate limiting to prevent API abuse, Row-Level Security (RLS) on the database, and session expiration with automatic cleanup. The communication between the Wallet and verifier websites is facilitated through a QR code-based verification protocol that encodes session parameters, verifier information, and required claims.
+
+ZeroAuth demonstrates a practical and scalable approach to privacy-preserving identity verification, providing a robust solution with multiple security layers that can be adapted to various applications including age-restricted content, educational institution verification, and trial/license management -- all while keeping the user's private data entirely on their device.
+
+\section{Objectives and Scope}
+
+The main objective of this project is to create a secure, privacy-preserving, and user-friendly authentication system based on Zero-Knowledge Proofs. The system enables the verification of user credentials (such as birth year for age verification, student status, or trial eligibility) over a network while maintaining the principles of CIA (Confidentiality, Integrity, Availability).
+
+The system achieves privacy preservation by allowing users to prove credentials without revealing private data using zk-SNARK circuits. Decentralized identity management is implemented through a wallet-based approach using the W3C \texttt{did:key} specification with Ed25519 keys. A JavaScript SDK enables any website to add ZeroAuth verification with minimal code, ensuring seamless integration. Poseidon hash-based commitments ensure credential binding without exposure, while SHA-256 hashing of proofs prevents replay attacks. The Relay server with Supabase backend supports multiple credential types and concurrent verification sessions, and queued action support is provided for offline scenarios with automatic sync when connectivity is restored.
+
+\subsection{Scope of the Project}
+
+The scope of ZeroAuth encompasses a cross-platform mobile application (Android and iOS) for credential storage and zero-knowledge proof generation, a cloud-deployed Node.js server for session management and proof verification, and a JavaScript library enabling verifier websites to integrate ZeroAuth with minimal configuration. The project also includes Circom circuits for age verification and student ID verification, extensible for additional credential types, along with live demonstration sites showing age verification and student ID verification in action.
+
+\section{Mission Statement}
+
+Our mission is to develop a privacy-first, Zero-Knowledge Proof authentication ecosystem that empowers users to own and control their digital identity while providing verifiers with cryptographic assurance of credential validity. By leveraging advanced cryptographic techniques such as Groth16 zk-SNARKs, Poseidon hashing, and Ed25519 digital signatures, our solution eliminates the need for users to share sensitive personal data during verification. Designed for scalability and ease of integration, the system provides a three-component architecture comprising a Wallet, Relay, and SDK that enables any web application to implement privacy-preserving authentication with minimal development effort, while maintaining high performance and adaptability across industries including content platforms, educational institutions, and software licensing.
+
+\section{Organization of the Report}
+
+This report is organized as follows. Chapter 2 reviews existing research on Zero-Knowledge Proofs, decentralized identity, zk-SNARKs, and privacy-preserving authentication protocols. Chapter 3 details the hardware, software, cryptographic, and protocol requirements of the ZeroAuth system. Chapter 4 presents the system architecture, use case diagrams, flowcharts, block diagram, and database schema. Chapter 5 describes the implementation of the Wallet application, Relay server, Web SDK, ZK circuits, and security mechanisms. Chapter 6 reports on the system's achievements, security verification results, API testing outcomes, and deployment details. Finally, Chapter 7 summarizes the project achievements and outlines directions for future development.
+

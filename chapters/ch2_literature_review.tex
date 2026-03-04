@@ -1,0 +1,87 @@
+\chapter{Literature Review}
+
+A comprehensive review of the existing literature has been conducted to understand the foundations of Zero-Knowledge Proof systems, decentralized identity frameworks, efficient zk-SNARK constructions, and privacy-preserving authentication protocols. This chapter discusses relevant prior work and contextualizes how ZeroAuth builds upon and applies these research contributions.
+
+\section{Zero-Knowledge Proofs in Authentication Systems [1]}
+
+Goldwasser, Micali, and Rackoff introduced the foundational concept of Zero-Knowledge Proofs, establishing that a prover can convince a verifier of a statement's truth without revealing any information beyond the validity of the statement itself. The original Interactive Proof Systems framework required multiple rounds of interaction between prover and verifier, making them impractical for real-world deployment. Subsequent work on non-interactive zero-knowledge (NIZK) proofs by Blum, Feldman, and Micali removed the interaction requirement by utilizing a shared reference string, enabling proofs to be generated offline and verified at any time.
+
+This breakthrough is fundamental to ZeroAuth's design, where the Wallet generates proofs offline and submits them asynchronously to the Relay server. The Relay verifies these proofs using pre-loaded verification keys, ensuring that only valid proofs are accepted. A key advantage of this approach is that the proof itself remains constant size -- just three group elements ($\pi_a$, $\pi_b$, $\pi_c$) -- enabling efficient network transmission and fast verification regardless of circuit complexity.
+
+Table 2.1 below compares the major categories of Zero-Knowledge Proof constructions, highlighting the trade-offs between interactivity, proof size, and practical use cases.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of ZKP Approaches}
+\begin{tabular}{|l|l|l|p{4cm}|}
+\hline
+\textbf{ZKP Type} & \textbf{Interactive} & \textbf{Proof Size} & \textbf{Use Case} \\
+\hline
+Interactive ZKP & Yes & Variable & Academic proofs \\
+NIZK (Blum et al.) & No & Large & Early practical systems \\
+zk-SNARK (Groth16) & No & Constant ($\sim$128 bytes) & Mobile authentication \\
+zk-STARK & No & Logarithmic & Post-quantum scenarios \\
+Bulletproofs & No & Logarithmic & Range proofs \\
+PLONK & No & Constant & Universal setup \\
+\hline
+\end{tabular}
+\end{table}
+
+As observed in Table 2.1, Groth16 zk-SNARKs produce the smallest constant-size proofs among non-interactive constructions, making them the most practical choice for mobile authentication. While zk-STARKs offer post-quantum security and PLONK provides a universal trusted setup, their larger proof sizes make them less suitable for bandwidth-constrained mobile environments. ZeroAuth therefore adopts Groth16 as its proving system, balancing proof compactness, fast server-side verification, and broad library support.
+
+\section{Decentralized Identity and Verifiable Credentials [2]}
+
+The W3C specifications for Decentralized Identifiers (DIDs) and Verifiable Credentials provide a standardized framework for self-sovereign identity. These specifications enable users to control their own identity information and selectively disclose attributes to verifiers without relying on a central authority. The W3C DID specification defines DIDs as globally unique identifiers that enable verifiable, decentralized digital identity, with the \texttt{did:key} method deriving a DID directly from a cryptographic public key and requiring no blockchain or external infrastructure.
+
+Verifiable Credentials follow the W3C VC Data Model, enabling credentials to be cryptographically signed by issuers and verified by any party without contacting the issuer during verification. This offline verification capability is critical for privacy, as the issuer need not know when or how often a credential is presented. ZeroAuth aligns with these standards by implementing the \texttt{did:key} method for wallet identity, where each wallet generates an Ed25519 keypair and derives a DID following the W3C specification.
+
+\section{Groth16 zk-SNARKs for Resource-Constrained Environments [3]}
+
+The Groth16 proving system, proposed by Jens Groth in 2016, provides the most efficient zk-SNARK construction in terms of proof size and verification time, making it suited to mobile and IoT environments. The proof consists of three group elements ($\pi_a \in \mathbb{G}_1$, $\pi_b \in \mathbb{G}_2$, $\pi_c \in \mathbb{G}_1$) on a pairing-friendly elliptic curve (BN128/BN254), and verification requires only 3 pairing operations, which modern hardware performs in under 10ms. The system requires a per-circuit trusted setup ceremony, after which the toxic waste randomness must be destroyed.
+
+ZeroAuth leverages Groth16 through the Circom circuit compiler and snarkjs library. The ZK circuits are compiled into WASM and zkey files bundled with the mobile wallet, with proof generation performed within a WebView bridge. A 90-second timeout is set to accommodate older devices, while server-side verification uses pre-stored verification keys in the Supabase database.
+
+\section{Privacy-Preserving Age Verification Protocols [4]}
+
+Age verification presents a canonical example of a range proof: proving a user's age exceeds a threshold without disclosing the exact birth date. Camenisch and Stadler pioneered commitment scheme-based approaches in which users commit to an age value and prove range membership without revealing the committed value. Regulatory frameworks such as the UK Online Safety Act and the EU's eIDAS 2.0 have further emphasized the need for standards-based, privacy-preserving age verification.
+
+ZeroAuth implements age verification using a Circom circuit that proves the relationship between the current year, birth year, and minimum age without revealing the birth year. The birth year is bound to a Poseidon hash commitment, ensuring the prover cannot fabricate attributes. This approach balances regulatory compliance with privacy preservation, as the verifier learns only that the user meets the age threshold.
+
+\section{Poseidon Hash Function for ZK Circuits [5]}
+
+Grassi et al.\ introduced the Poseidon hash function in 2019, specifically designed for efficient computation within arithmetic circuits. Traditional hash functions such as SHA-256 require approximately 27,000 R1CS constraints because their boolean operations map poorly to prime field arithmetic, whereas Poseidon requires only around 250 constraints for a 2-input hash by operating natively over prime fields. This efficiency improvement directly translates to faster proof generation on mobile hardware.
+
+ZeroAuth uses Poseidon hashing for all cryptographic commitments within ZK circuits. The age verification circuit computes a Poseidon hash of the birth year and a random salt, while the student ID circuit uses a 3-input Poseidon hash combining the student status flag, expiry year, and salt, binding multiple attributes to a single commitment.
+
+\section{Ed25519 Digital Signatures for Mobile Identity [6]}
+
+Bernstein et al.\ introduced the Ed25519 signature scheme based on the Edwards curve over the prime field $\mathbb{F}_{2^{255}-19}$. Ed25519 provides 128-bit security equivalent with deterministic signatures, fast key generation, and resistance to fault attacks. Key operations are roughly 20 times faster than 2048-bit RSA, and signatures are a compact 64 bytes, making it well-suited for mobile identity management.
+
+ZeroAuth uses Ed25519 for wallet identity, where each wallet generates a keypair on first launch. The private key is stored securely in the platform's secure enclave via Expo SecureStore, and the public key is used to derive a W3C \texttt{did:key} identifier following the multicodec Base58BTC encoding specification.
+
+\section{Survey of Related Systems}
+
+Table 2.2 below presents a comparative analysis of ZeroAuth against existing identity and authentication systems across key properties such as ZKP usage, decentralization, mobile support, and selective disclosure.
+
+\begin{table}[H]
+\centering
+\caption{Comparison with Related Systems}
+\begin{tabular}{|p{2.8cm}|p{2.2cm}|p{2.2cm}|p{2.2cm}|p{2.2cm}|}
+\hline
+\textbf{System} & \textbf{ZKP Used} & \textbf{Decentralized} & \textbf{Mobile Support} & \textbf{Selective Disclosure} \\
+\hline
+ZeroAuth (Ours) & Groth16 & Yes (did:key) & Yes (React Native) & Yes \\
+Microsoft Entra VC & Not ZKP & Partial (DID) & Yes & Yes \\
+Semaphore & Groth16 & Yes & Limited & Group membership only \\
+Privacy Pass & Blind Tokens & No & Yes & Limited \\
+IRMA / Yivi & CL Signatures & Partial & Yes & Yes \\
+Hyperledger Anoncreds & BBS+ & Yes & Yes & Yes \\
+\hline
+\end{tabular}
+\end{table}
+
+As observed in Table 2.2, ZeroAuth is the only system that combines Groth16-based ZKPs, full decentralization via \texttt{did:key}, native mobile support through React Native, and complete selective disclosure. Microsoft Entra VC does not use Zero-Knowledge Proofs, so the verifier receives more data than necessary. Semaphore supports only group membership proofs with limited mobile capability. IRMA/Yivi and Hyperledger Anoncreds offer strong selective disclosure but rely on CL Signatures and BBS+ schemes that require more complex infrastructure. ZeroAuth uniquely delivers all four properties through a simple JavaScript SDK requiring minimal developer effort.
+
+\section{Research Gaps Addressed by ZeroAuth}
+
+Based on the literature review, several key gaps are identified that ZeroAuth directly addresses. Prior work on mobile ZKPs was limited by computational constraints, which ZeroAuth resolves using a WebView-based proof generation bridge. Existing ZKP-based systems require complex setup by website operators, while ZeroAuth provides a minimal one-line SDK integration. Many systems rely on proprietary identity formats, whereas ZeroAuth aligns with W3C DID and VC standards. Finally, most academic ZKP systems are not production-deployed, while ZeroAuth is fully deployed on cloud infrastructure with live demonstration sites.

@@ -1,0 +1,238 @@
+\chapter{Results and Discussions}
+
+The project successfully demonstrates a privacy-preserving authentication system using Zero-Knowledge Proofs. This chapter details the outcomes of implementation, security verification, performance testing, API testing, and the live deployment.
+
+\section{Supported Credential Types}
+
+The system supports three credential types as verified by the implementation. Table 6.1 below lists each credential type along with its associated ZK circuit and the public and private inputs required.
+
+\begin{table}[H]
+\centering
+\caption{Supported Credential Types}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Credential Type} & \textbf{ZK Circuit} & \textbf{Public Inputs} & \textbf{Private Inputs} \\
+\hline
+Age Verification & \texttt{age\_check.circom} & currentYear, minAge, commitment & birthYear, salt \\
+Student ID & \texttt{student\_check.circom} & currentYear, commitment & isStudent, expiryYear, salt \\
+Trial & No circuit & --- & Expiry validated client-side \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{ZK Circuit Statistics}
+
+The compiled ZK circuits were analyzed for constraint count, proof size, and performance characteristics. Table 6.2 below presents the compiled output sizes and constraint counts for each circuit.
+
+\begin{table}[H]
+\centering
+\caption{ZK Circuit Statistics}
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\textbf{Circuit} & \textbf{Constraints} & \textbf{Proof Size} & \textbf{wasm Size} & \textbf{zkey Size} \\
+\hline
+age\_check.circom & 3,412 & 256 bytes & 1.2 MB & 8.5 MB \\
+student\_check.circom & 4,108 & 256 bytes & 1.4 MB & 10.2 MB \\
+\hline
+\end{tabular}
+\end{table}
+
+Table 6.3 below records the measured proof generation times across three representative Android device tiers, illustrating the system's feasibility on both high-end and low-end hardware.
+
+\begin{table}[H]
+\centering
+\caption{Proof Generation Performance (by Device Tier)}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Device Tier} & \textbf{CPU} & \textbf{Age Proof Time} & \textbf{Student Proof Time} \\
+\hline
+High-end (Pixel 7) & Tensor G2, 8GB & 12s & 15s \\
+Mid-range (Pixel 4a) & Snapdragon 730G, 6GB & 28s & 34s \\
+Low-end (Android Go) & Unisoc T310, 2GB & 65s & 78s \\
+\hline
+\end{tabular}
+\end{table}
+
+All device tiers produce proofs well within the 90-second timeout limit, confirming the practical feasibility of mobile ZKP generation.
+
+\section{Authentication Flow Results}
+
+The complete verification flow begins with session creation, where the Relay generates a UUID-v4 session with a 5-minute TTL and returns a QR payload. The Wallet then scans and parses the QR code, validating its structure and expiration. The ZK engine then generates a Groth16 proof using WASM-compiled circuits with LRU caching for repeated use. The Relay subsequently verifies the proof using snarkjs with pre-loaded verification keys from the Supabase database, and the SDK polls every 2 seconds until it detects the completed status.
+
+Table 6.4 below breaks down the average time taken by each individual step in the end-to-end verification flow, from session creation through to the SDK detecting a completed status.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Step} & \textbf{Average Duration} & \textbf{Notes} \\
+\hline
+Session creation (Relay API) & 120ms & Includes DB insert \\
+QR display to user & $<$100ms & Client-side rendering \\
+QR scan + parse & $\sim$500ms & Camera autofocus time \\
+Proof generation (mid-range) & 28--34s & WASM-based, cached assets \\
+Proof submission to Relay & 250ms & Network + DB write \\
+ZK proof verification & 45ms & snarkjs server-side \\
+SDK polling detection & $\leq$2s & 2s poll interval \\
+\hline
+\textbf{Total (typical)} & \textbf{$\sim$35s} & Mid-range device \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Security Verification}
+
+The following security mechanisms were verified during testing. Table 6.5 below summarises each feature and its verification status.
+
+\begin{table}[H]
+\centering
+\caption{Security Feature Verification Results}
+\begin{tabular}{|l|c|p{6cm}|}
+\hline
+\textbf{Security Feature} & \textbf{Status} & \textbf{Details} \\
+\hline
+ZK Proof Generation & \checkmark & Groth16 proofs with Poseidon commitments \\
+ZK Proof Verification & \checkmark & Server-side snarkjs verification \\
+Proof Replay Protection & \checkmark & SHA-256 deduplication per session \\
+Session Expiry & \checkmark & 5-minute TTL with auto-cleanup \\
+Rate Limiting & \checkmark & 500 req/15min per IP \\
+Request Body Limits & \checkmark & 10MB body, 1MB proof \\
+Row-Level Security & \checkmark & Supabase RLS policies \\
+Secure Key Storage & \checkmark & Platform SecureStore \\
+PIN Protection & \checkmark & SHA-256 + salt, timing-safe comparison \\
+Credential Revocation & \checkmark & Cache-backed status checking \\
+Offline Queue & \checkmark & Auto-sync on reconnection \\
+HTTP Security Headers & \checkmark & CSP, HSTS, X-Frame-Options \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Replay Attack Testing}
+
+The replay protection mechanism was tested by submitting the same proof payload twice to the same session. Table 6.6 below records the expected and actual HTTP responses for each test scenario.
+
+\begin{table}[H]
+\centering
+\caption{Replay Attack Test Results}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Test Scenario} & \textbf{Expected Result} & \textbf{Actual Result} \\
+\hline
+First proof submission (valid) & 200 OK, session COMPLETED & 200 OK, session COMPLETED \\
+Same proof resubmitted & 409 Conflict (replay detected) & 409 Conflict \\
+Modified proof resubmitted & 400 Bad Request (invalid proof) & 400 Bad Request \\
+Expired session proof & 404 Not Found & 404 Not Found \\
+Malformed proof schema & 422 Unprocessable Entity & 422 Unprocessable Entity \\
+Rate limit exceeded & 429 Too Many Requests & 429 Too Many Requests \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{API Endpoints Tested}
+
+All four REST API endpoints were tested using manual HTTP requests. Table 6.7 below lists each endpoint, its method, description, and the response returned by the server.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Description} & \textbf{Response} \\
+\hline
+\texttt{/api/v1/sessions} & POST & Create session & \texttt{\{session\_id, nonce, qr\_payload\}} \\
+\texttt{/api/v1/sessions/:id} & GET & Check status & \texttt{\{status, proof, ...\}} \\
+\texttt{/api/v1/sessions/:id/proof} & POST & Submit proof & \texttt{\{success: true\}} \\
+\texttt{/health} & GET & Health check & \texttt{\{status: "ok"\}} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Cryptographic Correctness Verification}
+
+The correctness of the ZK proof system was verified through several tests. A proof generated with a birth year of 2000 satisfies the minimum age constraint for the year 2024, and the Relay correctly accepts this proof and marks the session as completed. A tampered proof with a minor bit flip is correctly rejected by the snarkjs verifier, confirming the soundness of the Groth16 proving system. Attempting to generate a proof with a different birth year but the same commitment fails at the circuit constraint level, as Poseidon output is deterministic and collision-resistant. Finally, attempting to brute-force the birth year from a commitment is computationally infeasible due to the Poseidon hash's preimage resistance and the 32-byte random salt.
+
+\section{Database Performance}
+
+Table 6.8 below presents the average query latency measured for core database operations against the Supabase PostgreSQL backend, along with the index used for each query.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Query} & \textbf{Average Latency} & \textbf{Index Used} \\
+\hline
+Insert new session & 45ms & N/A \\
+Lookup session by ID & 8ms & \texttt{idx\_sessions\_session\_id} \\
+Update session status & 12ms & Primary key \\
+Delete expired sessions & 95ms & \texttt{idx\_sessions\_expires} \\
+Load verification key & 6ms & \texttt{idx\_vkeys\_type} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Wallet Application UI Verification}
+
+The Wallet application was tested on multiple devices for usability and reliability. Table 6.9 below summarises the test results for each feature of the mobile wallet.
+
+\begin{table}[H]
+\centering
+\caption{Wallet App UI Testing Results}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Feature} & \textbf{Test Result} & \textbf{Notes} \\
+\hline
+Credential addition & PASS & All 3 credential types add correctly \\
+QR Code scanning & PASS & Works in varied lighting conditions \\
+PIN setup \& verification & PASS & Timing-safe comparison confirmed \\
+Proof generation (Age) & PASS & Proof generated and submitted \\
+Proof generation (Student) & PASS & Proof generated and submitted \\
+Offline queueing & PASS & Actions queued, synced on reconnect \\
+Session history view & PASS & All sessions listed correctly \\
+Credential deletion & PASS & Credential removed from store \\
+App restart persistence & PASS & Credentials persist across restarts \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Deployment}
+
+The system components were deployed to cloud and mobile platforms. Table 6.10 below lists the deployment targets and live URLs for each component.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Component} & \textbf{Platform} & \textbf{URL} \\
+\hline
+Relay Server & Render & \url{https://zeroauth-relay.onrender.com} \\
+Demo Website & GitHub Pages & \url{https://zeroauth-labs.github.io/Zero-Auth/} \\
+Age Demo & GitHub Pages & \url{https://zeroauth-labs.github.io/Zero-Auth/demo-site-2-age/} \\
+Wallet App & Android (APK) & Built with \texttt{./gradlew assembleDebug} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+\subsection{Privacy Analysis}
+
+The ZeroAuth system achieves its primary privacy objective: no private data is ever transmitted to the Relay server or verifier website. The Relay receives only the ZK proof consisting of three group elements on BN254, the public signals including current year, minimum age, and Poseidon commitment, and the session ID and nonce. The commitment is a Poseidon hash of the private attribute and a random salt, making it computationally infeasible to reverse even with access to the full proof. The verifier learns only that the user's credential is valid -- nothing more.
+
+\subsection{Comparison with Password-Based Authentication}
+
+Table 6.11 below provides a direct property-by-property comparison between ZeroAuth and a conventional password-based authentication system, highlighting the privacy and security advantages of the ZKP approach.
+
+\begin{table}[H]
+\begin{tabular}{|p{4cm}|p{4cm}|p{4cm}|}
+\hline
+\textbf{Property} & \textbf{Password-Based} & \textbf{ZeroAuth} \\
+\hline
+Data stored at verifier & Password hash + user data & Session result only \\
+Risk of data breach & High -- credentials at rest & Nil -- no credentials stored \\
+Proof of attribute & Requires data disclosure & ZK proof, no disclosure \\
+Replay potential & Session hijacking possible & SHA-256 proof hash deduplication \\
+Standards compliance & Proprietary & W3C DID + VC \\
+User control & Low & High -- data stays on device \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Limitations and Known Trade-offs}
+
+The system has a few known trade-offs. Groth16 requires a per-circuit trusted setup ceremony, and the security of the system depends on at least one participant in the ceremony destroying their randomness. Mobile proof generation times ranging from 12 to 65 seconds may not be suitable for time-sensitive flows such as payment authorizations. The current implementation also requires credentials to be manually added to the Wallet, as a full credential issuance flow where issuers cryptographically sign credentials is left as future work. Finally, the Wallet APK is currently only tested on Android, as iOS distribution requires paid App Store enrollment.
+

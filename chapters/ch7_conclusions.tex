@@ -1,0 +1,17 @@
+\chapter{Conclusions and Future Scope for Improvement}
+
+\section{Conclusions}
+
+This project successfully demonstrates that Zero-Knowledge Proof based authentication is not merely a theoretical concept but a practical, deployable solution for real-world privacy-preserving identity verification. ZeroAuth was designed, implemented, and deployed as a fully functional three-component system --- a React Native mobile Wallet, a Node.js Relay server, and a JavaScript Web SDK --- each carefully engineered to work in concert while ensuring that sensitive credential data never leaves the user's device at any point in the verification process.
+
+The Wallet application enables users to store multiple types of credentials locally and generate Groth16 zk-SNARK proofs using Circom circuits compiled to WebAssembly, executed within a sandboxed WebView bridge. The Relay server manages verification sessions with a five-minute TTL, validates incoming proof structures, performs server-side cryptographic verification using snarkjs, and enforces proof replay protection through SHA-256 hashing --- all backed by a Supabase PostgreSQL database with Row-Level Security policies. The Web SDK reduces integration effort for verifier websites to a single component or script tag, making the technology accessible to developers without deep cryptographic knowledge.
+
+Key achievements include privacy by design with no private attributes ever transmitted, multi-layer cryptographic security combining Poseidon commitments, Ed25519 identity, Groth16 proofs, and SHA-256 replay protection, standards compliance with the W3C did:key specification, and full production deployment on cloud infrastructure with live demo sites. The system proved functionally correct across all tested scenarios: valid proofs are accepted, tampered or replayed proofs are rejected, expired sessions are cleaned up automatically, and the mobile wallet operates correctly on Android devices ranging from high-end to low-end hardware. ZeroAuth demonstrates that privacy-preserving authentication can be both cryptographically rigorous and practically usable, paving the way for broader adoption of Zero-Knowledge Proofs in identity systems.
+
+\newpage
+\section{Future Scope for Improvement}
+
+While ZeroAuth achieves its intended objectives, several directions exist for future enhancement. On the cryptographic front, migrating from Groth16 to a universal zk-SNARK system such as PLONK or Halo2 would eliminate the per-circuit trusted setup ceremony, making the system more scalable and operationally simpler. Deploying auto-generated Solidity verifier contracts on Ethereum or Polygon would enable fully decentralised, trustless proof verification without a centralised Relay server. Integrating BBS+ signature-based Verifiable Credentials would allow issuer-signed credentials and true selective disclosure of multiple attributes from a single credential.
+
+On the platform side, publishing the Wallet to the Apple App Store and implementing a full credential issuance SDK for institutions such as universities and employers would complete the identity ecosystem. Performance improvements --- such as replacing the WebView bridge with a native WASM module and adding WebSocket push notifications instead of polling --- would further enhance the user experience. Finally, binding wallet credentials to device biometrics, implementing comprehensive audit logging, and adding a decentralised credential revocation registry would strengthen the security posture of the system for production-scale deployments.
+
